@@ -289,6 +289,9 @@
       }
     } else if (remaining <= 0) {
       goToEnded();
+    } else if (remaining <= 5) {
+      // Keep repainting during the final seconds so the frame rim can flash.
+      draw();
     }
   }
 
@@ -358,6 +361,19 @@
       ctx.strokeStyle = 'rgba(255,255,255,0.06)';
       roundRect(ctx, CARD.x + 0.5, CARD.y + 0.5, CARD.w - 1, CARD.h - 1, CARD.r);
       ctx.stroke();
+
+      // Flash the card rim yellow/red during the final five seconds.
+      if (phase === 'running' && totalSeconds > 0 && totalSeconds <= 5) {
+        const flashRed = Math.floor(Date.now() / 350) % 2 === 1;
+        ctx.save();
+        ctx.shadowColor = flashRed ? '#ff3b55' : '#ffd43b';
+        ctx.shadowBlur = 24;
+        ctx.strokeStyle = flashRed ? '#ff3b55' : '#ffd43b';
+        ctx.lineWidth = 5;
+        roundRect(ctx, CARD.x + 3, CARD.y + 3, CARD.w - 6, CARD.h - 6, CARD.r - 3);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Status pill
       let statusText = 'READY', statusFill = '#1c2538', statusBorder = '#2e3f60', statusTextColor = '#9bb2e6';
