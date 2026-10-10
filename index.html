@@ -273,7 +273,7 @@
 
     const remaining = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
 
-    // Play at most one beep for each displayed second in the final five seconds.
+    // Play at most one beep for each displayed second in the final six seconds.
     if (remaining > 0 && remaining <= 5 && remaining !== lastBeepSecond) {
       shortBeep();
       lastBeepSecond = remaining;
@@ -322,10 +322,17 @@
   const TIMER   = { y: 110, h: 130 };
   const MIN_BOX = { x: 55, y: 270, w: 130, h: 100, r: 28 };
   const SEC_BOX = { x: 215, y: 270, w: 130, h: 100, r: 28 };
-  const BTN_FULL = { x: 40, y: 420, w: 320, h: 100, r: 50 };
-  const BTN_RESTART = { x: 30, y: 420, w: 160, h: 100, r: 50 };
-  const BTN_END     = { x: 210, y: 420, w: 160, h: 100, r: 50 };
-  const HINT = { y: 560 };
+  const MIN_MINUS = { x: 65, y: 380, w: 48, h: 34, r: 12 };
+  const MIN_PLUS  = { x: 127, y: 380, w: 48, h: 34, r: 12 };
+  const SEC_MINUS = { x: 225, y: 380, w: 48, h: 34, r: 12 };
+  const SEC_PLUS  = { x: 287, y: 380, w: 48, h: 34, r: 12 };
+  const PRESET_30 = { x: 35, y: 425, w: 100, h: 40, r: 16 };
+  const PRESET_60 = { x: 150, y: 425, w: 100, h: 40, r: 16 };
+  const PRESET_120 = { x: 265, y: 425, w: 100, h: 40, r: 16 };
+  const BTN_FULL = { x: 40, y: 485, w: 320, h: 82, r: 41 };
+  const BTN_RESTART = { x: 30, y: 440, w: 160, h: 90, r: 45 };
+  const BTN_END     = { x: 210, y: 440, w: 160, h: 90, r: 45 };
+  const HINT = { y: 605 };
 
   function draw() {
     try {
@@ -413,6 +420,17 @@
 
         drawInputBox(MIN_BOX, String(minutesVal), activeField === 'min');
         drawInputBox(SEC_BOX, String(secondsVal).padStart(2, '0'), activeField === 'sec');
+
+        // One-minute/second adjustment controls
+        drawButton(MIN_MINUS, '−', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 24);
+        drawButton(MIN_PLUS, '+', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 24);
+        drawButton(SEC_MINUS, '−', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 24);
+        drawButton(SEC_PLUS, '+', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 24);
+
+        // Quick time presets
+        drawButton(PRESET_30, '30 SEC', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 15);
+        drawButton(PRESET_60, '1 MIN', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 15);
+        drawButton(PRESET_120, '2 MIN', '#26334b', '#1b2538', '#101827', 'rgba(0,0,0,0)', 15);
       }
 
       // Buttons
@@ -424,7 +442,7 @@
       }
 
       // Hint
-      let hint = 'beep last 6s · 0.5s horn at end';
+      let hint = 'beep last 5s · 0.5s horn at end';
       if (phase === 'running') hint = 'RESTART to replay · END to set new time';
       else if (phase === 'ended') hint = 'RESTART or END to set a new timer';
 
@@ -508,6 +526,31 @@
         updateTotalFromInputs();
         if (totalSeconds < 1) { totalSeconds = 1; minutesVal = 0; secondsVal = 1; }
         goToRunning();
+        return;
+      }
+      // Quick presets
+      if (hit(p.x, p.y, PRESET_30) || hit(p.x, p.y, PRESET_60) || hit(p.x, p.y, PRESET_120)) {
+        if (hit(p.x, p.y, PRESET_30)) { minutesVal = 0; secondsVal = 30; }
+        else if (hit(p.x, p.y, PRESET_60)) { minutesVal = 1; secondsVal = 0; }
+        else { minutesVal = 2; secondsVal = 0; }
+        activeField = null;
+        hiddenInput.blur();
+        updateTotalFromInputs();
+        draw();
+        return;
+      }
+
+      // Adjust minutes or seconds by one per tap.
+      if (hit(p.x, p.y, MIN_MINUS) || hit(p.x, p.y, MIN_PLUS) ||
+          hit(p.x, p.y, SEC_MINUS) || hit(p.x, p.y, SEC_PLUS)) {
+        if (hit(p.x, p.y, MIN_MINUS)) minutesVal = Math.max(0, minutesVal - 1);
+        if (hit(p.x, p.y, MIN_PLUS)) minutesVal = Math.min(99, minutesVal + 1);
+        if (hit(p.x, p.y, SEC_MINUS)) secondsVal = Math.max(0, secondsVal - 1);
+        if (hit(p.x, p.y, SEC_PLUS)) secondsVal = Math.min(59, secondsVal + 1);
+        activeField = null;
+        hiddenInput.blur();
+        updateTotalFromInputs();
+        draw();
         return;
       }
       if (hit(p.x, p.y, MIN_BOX)) {
