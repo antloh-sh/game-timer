@@ -93,6 +93,7 @@
   let startSeconds = 30;
   let timerInterval = null;
   let deadlineMs = null;
+  let pausedRemainingMs = null;
   let lastBeepSecond = null;
 
   let minutesVal = 0;
@@ -227,6 +228,7 @@
   function goToSetup() {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     deadlineMs = null;
+    pausedRemainingMs = null;
     lastBeepSecond = null;
     phase = 'setup';
     totalSeconds = minutesVal * 60 + secondsVal;
@@ -248,6 +250,7 @@
   function goToEnded() {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     deadlineMs = null;
+    pausedRemainingMs = null;
     lastBeepSecond = null;
     phase = 'ended';
     totalSeconds = 0;
@@ -257,11 +260,32 @@
 
   function restartCountdown() {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    pausedRemainingMs = null;
     totalSeconds = startSeconds;
     phase = 'running';
     deadlineMs = Date.now() + totalSeconds * 1000;
     lastBeepSecond = null;
     bingSound();
+    timerInterval = setInterval(onTick, 200);
+    draw();
+  }
+
+  function pauseCountdown() {
+    if (phase !== 'running' || deadlineMs === null) return;
+    pausedRemainingMs = Math.max(0, deadlineMs - Date.now());
+    totalSeconds = Math.max(0, Math.ceil(pausedRemainingMs / 1000));
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    deadlineMs = null;
+    phase = 'paused';
+    draw();
+  }
+
+  function resumeCountdown() {
+    if (phase !== 'paused') return;
+    const remaining = pausedRemainingMs === null ? totalSeconds * 1000 : pausedRemainingMs;
+    deadlineMs = Date.now() + remaining;
+    pausedRemainingMs = null;
+    phase = 'running';
     timerInterval = setInterval(onTick, 200);
     draw();
   }
@@ -333,9 +357,10 @@
   const PRESET_60 = { x: 150, y: 425, w: 100, h: 40, r: 16 };
   const PRESET_120 = { x: 265, y: 425, w: 100, h: 40, r: 16 };
   const BTN_FULL = { x: 40, y: 485, w: 320, h: 82, r: 41 };
-  const BTN_RESTART = { x: 30, y: 440, w: 160, h: 90, r: 45 };
-  const BTN_END     = { x: 210, y: 440, w: 160, h: 90, r: 45 };
-  const HINT = { y: 605 };
+  const BTN_RESTART = { x: 30, y: 430, w: 160, h: 70, r: 30 };
+  const BTN_PAUSE   = { x: 210, y: 430, w: 160, h: 70, r: 30 };
+  const BTN_END     = { x: 40, y: 535, w: 320, h: 58, r: 29 };
+  const HINT = { y: 625 };
 
   function draw() {
     try {
@@ -379,6 +404,8 @@
       let statusText = 'READY', statusFill = '#1c2538', statusBorder = '#2e3f60', statusTextColor = '#9bb2e6';
       if (phase === 'running') {
         statusText = 'RUNNING'; statusFill = '#1e3b2b'; statusBorder = '#2f7a4a'; statusTextColor = '#7bffb0';
+      } else if (phase === 'paused') {
+        statusText = 'PAUSED'; statusFill = '#3b321e'; statusBorder = '#aa8b3f'; statusTextColor = '#ffd86b';
       } else if (phase === 'ended') {
         statusText = 'ENDED'; statusFill = '#3b1e2a'; statusBorder = '#aa3f5a'; statusTextColor = '#ff8da1';
       }
@@ -453,13 +480,17 @@
       if (phase === 'setup') {
         drawButton(BTN_FULL, 'START', '#4f7cff', '#2e5bda', '#1a3170', 'rgba(46,91,218,0.4)', 30);
       } else {
-        drawButton(BTN_RESTART, 'RESTART', '#2ec27e', '#1e8f5a', '#0e4a2e', 'rgba(30,143,90,0.4)', 22);
+        drawButton(BTN_RESTART, 'RESTART', '#2ec27e', '#1e8f5a', '#0e4a2e', 'rgba(30,143,90,0.4)', 19);
+        if (phase === 'running' || phase === 'paused') {
+          drawButton(BTN_PAUSE, phase === 'paused' ? 'RESUME' : 'PAUSE', '#f5c542', '#c99019', '#684b0b', 'rgba(245,197,66,0.25)', 18);
+        }
         drawButton(BTN_END, 'END', '#ff5e7c', '#d43a58', '#7a1d31', 'rgba(212,58,88,0.4)', 22);
       }
 
       // Hint
       let hint = 'beep last 5s · 0.5s horn at end';
-      if (phase === 'running') hint = 'RESTART to replay · END to set new time';
+      if (phase === 'running') hint = 'PAUSE TIMER to hold countdown';
+      else if (phase === 'paused') hint = 'RESUME to continue countdown';
       else if (phase === 'ended') hint = 'RESTART or END to set a new timer';
 
       ctx.fillStyle = '#6b7a9c';
@@ -598,6 +629,11 @@
       restartCountdown();
       return;
     }
+    if ((phase === 'running' || phase === 'paused') && hit(p.x, p.y, BTN_PAUSE)) {
+      if (phase === 'running') pauseCountdown();
+      else resumeCountdown();
+      return;
+    }
     if (hit(p.x, p.y, BTN_END)) {
       initAudio();
       goToSetup();
@@ -622,6 +658,10 @@
         updateTotalFromInputs();
         if (totalSeconds < 1) { totalSeconds = 1; minutesVal = 0; secondsVal = 1; }
         goToRunning();
+      } else if (phase === 'running') {
+        pauseCountdown();
+      } else if (phase === 'paused') {
+        resumeCountdown();
       } else {
         goToSetup();
       }
